@@ -1,0 +1,17 @@
+[project]
+name = "project5-edge-vit"
+version = "0.1.0"
+description = "High-Throughput CPU Inference for Vision Transformers"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "torch",
+    "torchvision",
+    "transformers",
+    "psutil",
+    "tqdm",
+    "matplotlib",
+    "scikit-learn"
+]
+
+
