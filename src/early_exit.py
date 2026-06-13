@@ -101,4 +101,6 @@ def train_early_exit(model, early_exit_head, train_loader, val_loader, exit_laye
             pbar.set_postfix({'loss': total_loss/(total/images.size(0)), 'acc': correct/total})
             
     print("Early exit head trained!")
+    model.to("cpu")
+    early_exit_head.to("cpu")
     return early_exit_head

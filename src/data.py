@@ -1,6 +1,6 @@
 import os
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 def get_imagenette_data(batch_size=32, data_dir="../data", img_size=224):
     """
@@ -19,6 +19,10 @@ def get_imagenette_data(batch_size=32, data_dir="../data", img_size=224):
     print("Downloading CIFAR-10 for benchmarking...")
     train_dataset = datasets.CIFAR10(root=data_dir, train=True, download=True, transform=transform)
     val_dataset = datasets.CIFAR10(root=data_dir, train=False, download=True, transform=transform)
+
+    # Use full training dataset for GPU training, and subset validation dataset
+    # to 500 images to keep the CPU feature similarity evaluation fast
+    val_dataset = Subset(val_dataset, list(range(500)))
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
