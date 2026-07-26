@@ -14,7 +14,7 @@ def measure_latency(model, dummy_input, num_warmup=5, num_runs=20):
     dummy_input = dummy_input.to(device)
     
     # Warmup
-    with torch.no_grad():
+    with torch.inference_mode():
         for _ in range(num_warmup):
             try:
                 _ = model(dummy_input)
@@ -22,7 +22,7 @@ def measure_latency(model, dummy_input, num_warmup=5, num_runs=20):
                 pass # Handle EarlyExitException if it occurs during warmup
             
     latencies = []
-    with torch.no_grad():
+    with torch.inference_mode():
         for _ in range(num_runs):
             start = time.perf_counter()
             try:
@@ -50,7 +50,8 @@ def estimate_flops(model, input_shape=(1, 3, 224, 224)):
     If ToMe and Early Exit are applied, we estimate the reduction.
     For demonstration, we return a mock value based on the model's attributes.
     """
-    base_gflops = 17.5
+    total_params = sum(p.numel() for p in model.parameters())
+    base_gflops = 17.5 * (total_params / 86_600_000.0)
     
     # Check for early exit and ToMe
     layers = 12

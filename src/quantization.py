@@ -22,10 +22,9 @@ def apply_dynamic_quantization(model):
 
 def get_model_size_mb(model):
     """
-    Returns the size of the model in MB by saving it to a temporary buffer.
+    Returns the size of the model parameters and buffers in MB.
     """
-    import tempfile
-    with tempfile.NamedTemporaryFile(delete=True) as tmp:
-        torch.save(model.state_dict(), tmp.name)
-        size_mb = os.path.getsize(tmp.name) / (1024 * 1024)
+    param_size = sum(p.nelement() * p.element_size() for p in model.parameters())
+    buffer_size = sum(b.nelement() * b.element_size() for b in model.buffers())
+    size_mb = (param_size + buffer_size) / (1024 * 1024)
     return size_mb

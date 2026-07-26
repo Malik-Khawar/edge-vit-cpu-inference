@@ -11,7 +11,9 @@ dependencies = [
     "psutil",
     "tqdm",
     "matplotlib",
-    "scikit-learn"
+    "scikit-learn",
+    "fastapi",
+    "uvicorn"
 ]
 
 

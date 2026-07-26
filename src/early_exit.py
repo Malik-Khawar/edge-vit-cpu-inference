@@ -55,6 +55,10 @@ def train_early_exit(model, early_exit_head, train_loader, val_loader, exit_laye
     """
     Trains ONLY the early exit head, freezing the rest of the model.
     """
+    if str(device).startswith("cuda") and not torch.cuda.is_available():
+        print("CUDA requested but not available. Gracefully falling back to device='cpu'.")
+        device = "cpu"
+
     model.to(device)
     early_exit_head.to(device)
     

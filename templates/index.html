@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeViT: High-Throughput CPU Inference Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #f1f5f9;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+        }
+        .glass-card:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+        /* Custom Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider-switch {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #334155;
+            transition: .3s;
+            border-radius: 24px;
+        }
+        .slider-switch:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider-switch {
+            background-color: #38bdf8;
+        }
+        input:checked + .slider-switch:before {
+            transform: translateX(20px);
+        }
+        /* Range slider styling */
+        input[type=range] {
+            accent-color: #38bdf8;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/60 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-bolt text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">
+                        EdgeViT CPU Inference Engine
+                    </h1>
+                    <p class="text-xs text-slate-400">High-Throughput Vision Transformer CPU Optimization Dashboard</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-2"></span> System Ready
+                </span>
+                <span class="text-xs text-slate-400 px-3 py-1 rounded-lg bg-slate-800 border border-slate-700">
+                    PyTorch 2.x • Intel/AMD CPU
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-6 pt-8 space-y-8">
+        
+        <!-- Controls & Configuration Grid -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Token Merging (ToMe) Card -->
+            <div class="glass-card p-6 space-y-5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                            <i class="fa-solid fa-layer-group"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-semibold text-white">Token Merging (ToMe)</h2>
+                            <p class="text-xs text-slate-400">Bipartite soft matching token reduction</p>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="use_tome" checked onchange="toggleTomeSlider()">
+                        <span class="slider-switch"></span>
+                    </label>
+                </div>
+
+                <div id="tome-slider-container" class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Tokens Merged per Layer (r):</span>
+                        <span id="tome_val" class="font-bold text-cyan-400">4</span>
+                    </div>
+                    <input type="range" id="tome_r" min="1" max="16" value="4" step="1" 
+                           class="w-full h-2 bg-slate-700 rounded-lg cursor-pointer"
+                           oninput="document.getElementById('tome_val').innerText = this.value">
+                    <div class="flex justify-between text-[10px] text-slate-500">
+                        <span>r=1 (Mild)</span>
+                        <span>r=8 (Balanced)</span>
+                        <span>r=16 (Aggressive)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Early Exit Head Card -->
+            <div class="glass-card p-6 space-y-5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-semibold text-white">Early Exit Classifier</h2>
+                            <p class="text-xs text-slate-400">Dynamic layer exit based on entropy</p>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="early_exit_enabled" checked onchange="toggleEarlyExitSlider()">
+                        <span class="slider-switch"></span>
+                    </label>
+                </div>
+
+                <div id="ee-slider-container" class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Entropy Confidence Threshold:</span>
+                        <span id="entropy_val" class="font-bold text-indigo-400">1.50</span>
+                    </div>
+                    <input type="range" id="entropy_threshold" min="0.2" max="3.0" value="1.5" step="0.1" 
+                           class="w-full h-2 bg-slate-700 rounded-lg cursor-pointer"
+                           oninput="document.getElementById('entropy_val').innerText = parseFloat(this.value).toFixed(2)">
+                    <div class="flex justify-between text-[10px] text-slate-500">
+                        <span>0.2 (High Conf)</span>
+                        <span>1.5 (Standard)</span>
+                        <span>3.0 (Fast Exit)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INT8 Quantization & Quick Presets -->
+            <div class="glass-card p-6 space-y-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                                <i class="fa-solid fa-microchip"></i>
+                            </div>
+                            <div>
+                                <h2 class="font-semibold text-white">INT8 Dynamic Quantization</h2>
+                                <p class="text-xs text-slate-400">PyTorch ao qint8 Linear compression</p>
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="use_quantization" checked>
+                            <span class="slider-switch"></span>
+                        </label>
+                    </div>
+                    <div class="p-3 rounded-lg bg-slate-800/80 border border-slate-700/50 text-xs text-slate-300">
+                        <i class="fa-solid fa-circle-info text-cyan-400 mr-1"></i> Quantizes linear projection matrices from FP32 (32-bit) to INT8 (8-bit), slashing RAM footprint by ~73%.
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button id="run-btn" onclick="runCustomBenchmark()" 
+                            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-semibold flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/25 hover:opacity-95 transition-all">
+                        <i class="fa-solid fa-play"></i>
+                        <span>Run CPU Benchmark</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Presets Ribbon -->
+        <section class="flex flex-wrap items-center gap-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-2">Presets:</span>
+            <button onclick="applyPreset('baseline')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-slate-700 transition">
+                Baseline (FP32)
+            </button>
+            <button onclick="applyPreset('tome')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-slate-700 transition">
+                ToMe Only (r=4)
+            </button>
+            <button onclick="applyPreset('early_exit')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-slate-700 transition">
+                Early Exit Only
+            </button>
+            <button onclick="applyPreset('quantized')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-slate-700 transition">
+                Quantized Only (INT8)
+            </button>
+            <button onclick="applyPreset('edgevit')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-cyan-500/50 text-cyan-400 transition">
+                ⚡ EdgeViT (Full Stack)
+            </button>
+        </section>
+
+        <!-- Live KPI Metrics Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Latency KPI -->
+            <div class="glass-card p-5 relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl pointer-events-none"></div>
+                <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Inference Latency</p>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-latency" class="text-3xl font-extrabold text-white">--</span>
+                    <span id="kpi-speedup" class="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">--</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">CPU execution time per batch (1, 3, 224, 224)</p>
+            </div>
+
+            <!-- Model Size KPI -->
+            <div class="glass-card p-5 relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+                <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Model Memory Footprint</p>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-size" class="text-3xl font-extrabold text-white">--</span>
+                    <span id="kpi-reduction" class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">--</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">Serialized parameter storage in RAM</p>
+            </div>
+
+            <!-- Feature Similarity KPI -->
+            <div class="glass-card p-5 relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
+                <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Feature Similarity</p>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-similarity" class="text-3xl font-extrabold text-white">--</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Cosine Fidelity</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">CLS feature similarity vs FP32 baseline</p>
+            </div>
+
+            <!-- Compute GFLOPs KPI -->
+            <div class="glass-card p-5 relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
+                <p class="text-xs font-medium uppercase tracking-wider text-slate-400">FLOPs Complexity</p>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-flops" class="text-3xl font-extrabold text-white">--</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">GFLOPs</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">Floating point operations per sample</p>
+            </div>
+        </section>
+
+        <!-- Charts Grid -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Bar Chart: Latency vs Model Size -->
+            <div class="glass-card p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-cyan-400"></i>
+                        Inference Latency & Model Size Comparison
+                    </h3>
+                    <span class="text-[10px] text-slate-400">Dual Axis Comparison</span>
+                </div>
+                <div class="relative h-72">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Scatter Chart: Speed vs Fidelity Pareto Frontier -->
+            <div class="glass-card p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-indigo-400"></i>
+                        Pareto Frontier (Latency vs Feature Cosine Similarity)
+                    </h3>
+                    <span class="text-[10px] text-slate-400">Optimal Tradeoff Curve</span>
+                </div>
+                <div class="relative h-72">
+                    <canvas id="paretoChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script Logic -->
+    <script>
+        let barChart = null;
+        let paretoChart = null;
+
+        function toggleTomeSlider() {
+            const enabled = document.getElementById('use_tome').checked;
+            document.getElementById('tome-slider-container').style.opacity = enabled ? '1' : '0.4';
+            document.getElementById('tome_r').disabled = !enabled;
+        }
+
+        function toggleEarlyExitSlider() {
+            const enabled = document.getElementById('early_exit_enabled').checked;
+            document.getElementById('ee-slider-container').style.opacity = enabled ? '1' : '0.4';
+            document.getElementById('entropy_threshold').disabled = !enabled;
+        }
+
+        function applyPreset(presetType) {
+            if (presetType === 'baseline') {
+                document.getElementById('use_tome').checked = false;
+                document.getElementById('early_exit_enabled').checked = false;
+                document.getElementById('use_quantization').checked = false;
+            } else if (presetType === 'tome') {
+                document.getElementById('use_tome').checked = true;
+                document.getElementById('tome_r').value = 4;
+                document.getElementById('tome_val').innerText = '4';
+                document.getElementById('early_exit_enabled').checked = false;
+                document.getElementById('use_quantization').checked = false;
+            } else if (presetType === 'early_exit') {
+                document.getElementById('use_tome').checked = false;
+                document.getElementById('early_exit_enabled').checked = true;
+                document.getElementById('entropy_threshold').value = 1.5;
+                document.getElementById('entropy_val').innerText = '1.50';
+                document.getElementById('use_quantization').checked = false;
+            } else if (presetType === 'quantized') {
+                document.getElementById('use_tome').checked = false;
+                document.getElementById('early_exit_enabled').checked = false;
+                document.getElementById('use_quantization').checked = true;
+            } else if (presetType === 'edgevit') {
+                document.getElementById('use_tome').checked = true;
+                document.getElementById('tome_r').value = 4;
+                document.getElementById('tome_val').innerText = '4';
+                document.getElementById('early_exit_enabled').checked = true;
+                document.getElementById('entropy_threshold').value = 1.5;
+                document.getElementById('entropy_val').innerText = '1.50';
+                document.getElementById('use_quantization').checked = true;
+            }
+            toggleTomeSlider();
+            toggleEarlyExitSlider();
+            runCustomBenchmark();
+        }
+
+        async function runCustomBenchmark() {
+            const btn = document.getElementById('run-btn');
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> <span>Running CPU Benchmark...</span>`;
+            btn.disabled = true;
+
+            const payload = {
+                tome_r: parseInt(document.getElementById('tome_r').value),
+                use_tome: document.getElementById('use_tome').checked,
+                early_exit_enabled: document.getElementById('early_exit_enabled').checked,
+                entropy_threshold: parseFloat(document.getElementById('entropy_threshold').value),
+                use_quantization: document.getElementById('use_quantization').checked
+            };
+
+            try {
+                const response = await fetch('/api/benchmark', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    updateDashboard(data);
+                }
+            } catch (err) {
+                console.error("Benchmark error:", err);
+            } finally {
+                btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Run CPU Benchmark</span>`;
+                btn.disabled = false;
+            }
+        }
+
+        function updateDashboard(data) {
+            const m = data.metrics;
+            document.getElementById('kpi-latency').innerText = `${m.latency_ms} ms`;
+            document.getElementById('kpi-speedup').innerText = `${m.speedup_x}x Speedup`;
+            
+            document.getElementById('kpi-size').innerText = `${m.model_size_mb} MB`;
+            document.getElementById('kpi-reduction').innerText = `-${m.size_reduction_pct}% RAM`;
+            
+            document.getElementById('kpi-similarity').innerText = `${m.feature_similarity_pct}%`;
+            document.getElementById('kpi-flops').innerText = `${m.flops_gflops}`;
+
+            renderBarChart(data.presets, data.metrics);
+            renderParetoChart(data.presets, data.metrics);
+        }
+
+        function renderBarChart(presets, currentMetrics) {
+            const ctx = document.getElementById('barChart').getContext('2d');
+            
+            const labels = [...presets.map(p => p.name), 'Custom Configuration'];
+            const latencies = [...presets.map(p => p.latency), currentMetrics.latency_ms];
+            const sizes = [...presets.map(p => p.size), currentMetrics.model_size_mb];
+
+            if (barChart) barChart.destroy();
+
+            barChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Latency (ms)',
+                            data: latencies,
+                            backgroundColor: '#38bdf8',
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Model Size (MB)',
+                            data: sizes,
+                            backgroundColor: '#f43f5e',
+                            borderRadius: 6,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 10 } },
+                            grid: { color: '#1e293b' }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Latency (ms)', color: '#38bdf8' },
+                            ticks: { color: '#38bdf8' },
+                            grid: { color: '#1e293b' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'Size (MB)', color: '#f43f5e' },
+                            ticks: { color: '#f43f5e' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } }
+                    }
+                }
+            });
+        }
+
+        function renderParetoChart(presets, currentMetrics) {
+            const ctx = document.getElementById('paretoChart').getContext('2d');
+
+            const presetPoints = presets.map(p => ({ x: p.latency, y: p.sim, name: p.name }));
+            const customPoint = [{ x: currentMetrics.latency_ms, y: currentMetrics.feature_similarity_pct, name: 'Custom Config' }];
+
+            if (paretoChart) paretoChart.destroy();
+
+            paretoChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Presets',
+                            data: presetPoints,
+                            backgroundColor: '#818cf8',
+                            pointRadius: 8,
+                            pointHoverRadius: 10
+                        },
+                        {
+                            label: 'Custom Active Config',
+                            data: customPoint,
+                            backgroundColor: '#fbbf24',
+                            pointRadius: 12,
+                            pointHoverRadius: 14
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Latency (ms, lower is better)', color: '#cbd5e1' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#1e293b' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Feature Similarity (%, higher is better)', color: '#cbd5e1' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#1e293b' }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const raw = context.raw;
+                                    return `${raw.name || 'Config'}: Latency ${raw.x} ms, Sim ${raw.y}%`;
+                                }
+                            }
+                        },
+                        legend: { labels: { color: '#cbd5e1' } }
+                    }
+                }
+            });
+        }
+
+        // Auto load initial benchmark on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            toggleTomeSlider();
+            toggleEarlyExitSlider();
+            runCustomBenchmark();
+        });
+    </script>
+</body>
+</html>

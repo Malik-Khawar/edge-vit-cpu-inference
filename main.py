@@ -63,7 +63,9 @@ def run_pipeline():
     
     # 4. Train Early Exit Head (using ToMe model for feature extraction)
     exit_layer = 5 # 6th layer
-    early_exit_head = EarlyExitHead(hidden_size=768, num_classes=1000)
+    hidden_size = getattr(baseline_model.config, 'hidden_size', 768)
+    num_classes = getattr(baseline_model.config, 'num_labels', 1000)
+    early_exit_head = EarlyExitHead(hidden_size=hidden_size, num_classes=num_classes)
     early_exit_head = train_early_exit(
         tome_model, early_exit_head, train_loader, val_loader, 
         exit_layer=exit_layer, epochs=1, device=device
