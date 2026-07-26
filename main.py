@@ -10,19 +10,19 @@ from src.profile import measure_latency, get_ram_usage, estimate_flops
 from src.evaluate import evaluate_feature_similarity
 from src.plot import generate_optimization_plots
 
-def run_pipeline():
+def run_pipeline(use_synthetic=False, model_name="facebook/deit-tiny-patch16-224"):
     print("================================================================================")
     print("Project 5: EdgeViT - High-Throughput CPU Inference for Vision Transformers")
     print("================================================================================")
     
     # 1. Load Data
-    train_loader, val_loader = get_imagenette_data(batch_size=16) # Smaller batch for fast demo
+    train_loader, val_loader = get_imagenette_data(batch_size=16, use_synthetic=use_synthetic)
     
     # We will use GPU for training the early exit head if available
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # 2. Load Baseline Model
-    baseline_model, processor = load_vit_baseline()
+    baseline_model, processor = load_vit_baseline(model_name=model_name)
     
     # Measure Baseline stats
     print("\n--- Benchmarking Baseline ViT ---")
@@ -138,4 +138,12 @@ def run_pipeline():
     print("================================================================================")
 
 if __name__ == "__main__":
-    run_pipeline()
+    import argparse
+    parser = argparse.ArgumentParser(description="EdgeViT CPU Inference Optimization Benchmark")
+    parser.add_argument("--synthetic", action="store_true", default=False, help="Use fast synthetic benchmark image tensors for zero-latency CPU profiling")
+    parser.add_argument("--real-data", action="store_true", default=False, help="Force downloading/loading real CIFAR-10 image dataset")
+    parser.add_argument("--model", type=str, default="facebook/deit-tiny-patch16-224", help="HuggingFace ViT model name (e.g. facebook/deit-tiny-patch16-224 or google/vit-base-patch16-224)")
+    args = parser.parse_args()
+    
+    use_synth = True if args.synthetic else (False if args.real-data else False)
+    run_pipeline(use_synthetic=use_synth, model_name=args.model)
